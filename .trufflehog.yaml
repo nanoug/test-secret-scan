@@ -1,34 +1,21 @@
-# Enable verbose output
-verbose = true
 
-# Enable entropy scanning
-entropy = true
+verbose: true
+entropy: true
+only_verified: true
+max_depth: 100
 
-# Enable credential validation
-only_verified = true
+allowlist:
+  - regex: "ghp_exampleFakeToken1234567890"
+  - regex: "AKIAIOSFODNN7EXAMPLE"
 
-# Set the maximum depth of Git history to scan
-max_depth = 100
+path_allowlist:
+  - path: "docs/fake-secrets.txt"
 
-# Define allowlist patterns to ignore known false positives
-[[allowlist]]
-regex = "ghp_exampleFakeToken1234567890"
+author_allowlist:
+  - author: "testuser@example.com"
 
-[[allowlist]]
-regex = "AKIAIOSFODNN7EXAMPLE"
+commit_message_allowlist:
+  - regex: "test commit with fake secrets"
 
-# Optional: ignore specific file paths
-[[path_allowlist]]
-path = "docs/fake-secrets.txt"
-
-# Optional: ignore specific commit authors
-[[author_allowlist]]
-author = "testuser@example.com"
-
-# Optional: ignore specific commit messages
-[[commit_message_allowlist]]
-regex = "test commit with fake secrets"
-
-# Optional: ignore specific branches
-[[branch_allowlist]]
-branch = "test-branch"
+branch_allowlist:
+  - branch: "test-branch"
