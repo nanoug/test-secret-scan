@@ -1,5 +1,3 @@
-
-verbose: true
 entropy: true
 only_verified: true
 max_depth: 100
