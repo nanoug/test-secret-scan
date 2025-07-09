@@ -1,0 +1,25 @@
+name: TruffleHog Secret Scan
+
+on:
+  pull_request:
+
+jobs:
+  trufflehog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v3
+
+      - name: Install TruffleHog
+        run: |
+          pip install trufflehog
+
+      - name: Run TruffleHog on PR
+        run: |
+          trufflehog filesystem --json . > trufflehog-results.json
+
+      - name: Upload TruffleHog results (optional)
+        uses: actions/upload-artifact@v3
+        with:
+          name: trufflehog-results
+          path: trufflehog-results.json
