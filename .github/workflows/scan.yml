@@ -16,7 +16,7 @@ jobs:
 
       - name: Run TruffleHog on PR
         run: |
-          trufflehog filesystem --json . > trufflehog-results.json
+          trufflehog --json . > trufflehog-results.json
 
       - name: Upload TruffleHog results (optional)
         uses: actions/upload-artifact@v4
