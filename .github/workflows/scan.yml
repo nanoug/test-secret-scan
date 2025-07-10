@@ -1,25 +1,35 @@
-name: TruffleHog Secret Scan
+name: TruffleHog PR Secret Scan
 
 on:
   pull_request:
+    branches:
+      - main  
 
 jobs:
-  trufflehog:
+  scan-secrets:
+    name: Scan for Secrets with TruffleHog
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v3
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
       - name: Install TruffleHog
-        run: |
-          pip install trufflehog
+        run: pip install trufflehog
 
-      - name: Run TruffleHog on PR
+      - name: Run TruffleHog on PR branch
         run: |
-          trufflehog filesystem --json . > trufflehog-results.json
+          echo "Scanning branch: ${{ github.head_ref }}"
+          trufflehog git https://github.com/nanoug/test-secret-scan . --branch ${{ github.head_ref }} --json > trufflehog-results.json
+          cat trufflehog-results.json
 
-      - name: Upload TruffleHog results (optional)
-        uses: actions/upload-artifact@v3
+      - name: Upload scan results
+        uses: actions/upload-artifact@v4
         with:
           name: trufflehog-results
           path: trufflehog-results.json
