@@ -19,7 +19,7 @@ jobs:
           trufflehog filesystem --json . > trufflehog-results.json
 
       - name: Upload TruffleHog results (optional)
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: trufflehog-results
           path: trufflehog-results.json
