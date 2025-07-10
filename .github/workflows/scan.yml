@@ -25,7 +25,7 @@ jobs:
       - name: Run TruffleHog on PR branch
         run: |
           echo "Scanning branch: ${{ github.head_ref }}"
-          trufflehog git --branch ${{ github.head_ref }} --json > trufflehog-results.json
+          trufflehog filesystem . --json > trufflehog-results.json
           cat trufflehog-results.json
 
       - name: Upload scan results
