@@ -23,7 +23,8 @@ jobs:
         run: |
           echo "Scanning branch: ${{ github.head_ref }}"
           echo "Base branch: ${{ github.base_ref }}"
-          trufflehog git diff origin/${{ github.base_ref }}...HEAD --json > trufflehog_results.json
+          git fetch origin ${{ github.base_ref }}:${{ github.base_ref }}
+          trufflehog git file://. --since-commit origin/${{ github.base_ref }} --json > trufflehog_results.json
           echo "Scan completed. Results:"
           cat trufflehog_results.json
 
