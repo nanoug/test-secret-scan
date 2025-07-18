@@ -1,5 +1,4 @@
 name: TruffleHog PR Secret Scan
-
 on:
   pull_request:
     branches:
@@ -13,24 +12,23 @@ jobs:
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v3
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
         with:
-          python-version: '3.x'
+          fetch-depth: 0  # Fetch full history for proper diff
 
       - name: Install TruffleHog
-        run: pip install trufflehog
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
 
       - name: Run TruffleHog on PR branch
         run: |
           echo "Scanning branch: ${{ github.head_ref }}"
-          git fetch origin ${{ github.base_ref }} --depth=1
+          echo "Base branch: ${{ github.base_ref }}"
           trufflehog git diff origin/${{ github.base_ref }}...HEAD --json > trufflehog_results.json
-          cat trufflehog-results.json
+          echo "Scan completed. Results:"
+          cat trufflehog_results.json
 
       - name: Upload scan results
         uses: actions/upload-artifact@v4
         with:
           name: trufflehog-results
-          path: trufflehog-results.json
+          path: trufflehog_results.json  
