@@ -13,23 +13,59 @@ jobs:
       - name: Checkout PR code
         uses: actions/checkout@v3
         with:
-          fetch-depth: 0  # Fetch full history for proper diff
+          fetch-depth: 0
 
       - name: Install TruffleHog
         run: |
           curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
+          trufflehog --version
 
-      - name: Run TruffleHog on PR branch
+      - name: Debug Git Information
         run: |
-          echo "Scanning branch: ${{ github.head_ref }}"
-          echo "Base branch: ${{ github.base_ref }}"
-          git fetch origin ${{ github.base_ref }}:${{ github.base_ref }}
-          trufflehog git file://. --since-commit origin/${{ github.base_ref }} --json > trufflehog_results.json
-          echo "Scan completed. Results:"
+          echo "Current branch: $(git branch --show-current)"
+          echo "HEAD ref: ${{ github.head_ref }}"
+          echo "Base ref: ${{ github.base_ref }}"
+          echo "Commit range: origin/${{ github.base_ref }}..${{ github.sha }}"
+          git log --oneline origin/${{ github.base_ref }}..${{ github.sha }}
+
+      - name: Run TruffleHog on PR changes
+        run: |
+          # Scan only the changes in this PR
+          trufflehog git file://. --since-commit origin/${{ github.base_ref }} --json --no-update > trufflehog_results.json
+          
+          # Also try scanning just the changed files
+          git diff --name-only origin/${{ github.base_ref }} > changed_files.txt
+          echo "Changed files:"
+          cat changed_files.txt
+          
+          # Alternative scan method
+          trufflehog filesystem . --json --no-update > trufflehog_filesystem_results.json
+
+      - name: Display Results
+        run: |
+          echo "=== Git scan results ==="
           cat trufflehog_results.json
+          echo "=== Filesystem scan results ==="
+          cat trufflehog_filesystem_results.json
+          
+          # Check if any results were found
+          if [ -s trufflehog_results.json ]; then
+            echo "Secrets found in git scan!"
+          else
+            echo "No secrets found in git scan"
+          fi
+          
+          if [ -s trufflehog_filesystem_results.json ]; then
+            echo "Secrets found in filesystem scan!"
+          else
+            echo "No secrets found in filesystem scan"
+          fi
 
       - name: Upload scan results
         uses: actions/upload-artifact@v4
         with:
           name: trufflehog-results
-          path: trufflehog_results.json  
+          path: |
+            trufflehog_results.json
+            trufflehog_filesystem_results.json
+            changed_files.txt
