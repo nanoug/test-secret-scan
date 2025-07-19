@@ -15,72 +15,76 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: TruffleHog OSS
-        id: trufflehog
-        uses: trufflesecurity/trufflehog@main
-        continue-on-error: true
-        with:
-          path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --debug --include-detectors=all --no-verification
-
-      - name: Manual TruffleHog Scan (Fallback)
-        id: manual-scan
-        if: steps.trufflehog.outcome == 'success'
+      - name: Install and Run TruffleHog
+        id: scan
         run: |
-          # Install TruffleHog manually for more control
+          # Install TruffleHog
           curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh | sh -s -- -b /usr/local/bin
           
-          # Scan all changed files
-          echo "Scanning changed files..."
-          git diff --name-only ${{ github.event.pull_request.base.sha }}..HEAD > changed_files.txt
+          # Scan PR changes and output secrets
+          echo "🔍 Scanning for secrets..."
           
-          SECRET_FOUND=false
-          while IFS= read -r file; do
-            if [ -f "$file" ]; then
-              echo "Scanning: $file"
-              if trufflehog filesystem "$file" --no-update; then
-                SECRET_FOUND=true
-                echo "::error::Secrets found in $file"
-              fi
-            fi
-          done < changed_files.txt
-          
-          if [ "$SECRET_FOUND" = true ]; then
-            echo "manual_scan_failed=true" >> $GITHUB_OUTPUT
-            exit 1
-          fi
-
-      - name: Check Results and Block PR
-        run: |
-          if [ "${{ steps.trufflehog.outcome }}" == "failure" ] || [ "${{ steps.manual-scan.outputs.manual_scan_failed }}" == "true" ]; then
-            echo "🚨 SECRETS DETECTED! This PR cannot be merged."
-            echo "Check the scan steps above for details."
-            exit 1
+          # Run scan and capture output
+          if trufflehog git file://. --since-commit ${{ github.event.pull_request.base.sha }} --no-update --no-verification > scan_results.txt 2>&1; then
+            echo "scan_status=success" >> $GITHUB_OUTPUT
           else
-            echo "✅ No secrets detected. PR can proceed."
+            echo "scan_status=failed" >> $GITHUB_OUTPUT
+          fi
+          
+          # Check if any secrets were found
+          if [ -s scan_results.txt ]; then
+            echo "🚨 SECRETS DETECTED!"
+            echo "secrets_found=true" >> $GITHUB_OUTPUT
+            echo ""
+            echo "📋 Detected Secrets:"
+            echo "===================="
+            cat scan_results.txt
+            echo "===================="
+          else
+            echo "✅ No secrets detected"
+            echo "secrets_found=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Comment on PR if secrets found
-        if: steps.trufflehog.outcome == 'failure' || steps.manual-scan.outputs.manual_scan_failed == 'true'
+      - name: Block PR if secrets found
+        if: steps.scan.outputs.secrets_found == 'true'
+        run: |
+          echo "🚨 This PR cannot be merged due to detected secrets!"
+          echo "Please review the secrets listed above and remove them."
+          exit 1
+
+      - name: Comment on PR with secret details
+        if: steps.scan.outputs.secrets_found == 'true'
         uses: actions/github-script@v7
         with:
           script: |
+            const fs = require('fs');
+            let scanOutput = '';
+            
+            try {
+              scanOutput = fs.readFileSync('scan_results.txt', 'utf8');
+            } catch (error) {
+              scanOutput = 'Could not read scan results';
+            }
+            
             const comment = `## 🚨 Secrets Detected!
             
-            This PR contains potential secrets and cannot be merged until they are removed.
+            This PR contains secrets and cannot be merged until they are removed.
             
-            Please check the workflow logs above for detailed information about the detected secrets.
+            ### 📋 Detected Secrets:
+            \`\`\`
+            ${scanOutput}
+            \`\`\`
             
-            ### Files to check:
-            Look for secrets in files mentioned in the scan output above.
+            ### 🔧 Next Steps:
+            1. **Remove the secrets** shown above from your code
+            2. **Use environment variables** or secure secret management instead
+            3. **Push your changes** to update this PR
+            4. The PR will be **automatically re-scanned** when you push new commits
             
-            ### Next Steps:
-            1. Review the detected secrets in the workflow logs
-            2. Remove the secrets from your code  
-            3. Use environment variables or secure secret management instead
-            4. Push your changes to update this PR`;
+            ### 💡 Tips:
+            - Never commit API keys, passwords, or tokens
+            - Use \`.env\` files (and add them to \`.gitignore\`)
+            - Consider using GitHub Secrets for CI/CD`;
             
             await github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -88,3 +92,10 @@ jobs:
               repo: context.repo.repo,
               body: comment
             });
+
+      - name: Upload scan results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trufflehog-scan-results
+          path: scan_results.txt
